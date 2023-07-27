@@ -6,6 +6,7 @@ from functools import partial
 import pandas as pd
 import ray
 import torch
+from context import coati
 from coati.quant import llama_load_quant, low_resource_init
 from coati.ray.detached_trainer_ppo import DetachedPPOTrainer
 from coati.ray.experience_maker_holder import ExperienceMakerHolder
@@ -54,11 +55,9 @@ def main(args):
         'master_port': maker_port,
         'master_addr': master_addr
     } for rank in range(args.num_makers)]
-
     # configure tokenizer
     tokenizer = AutoTokenizer.from_pretrained(args.pretrain)
     tokenizer.pad_token = tokenizer.eos_token
-
     def model_fn():
         actor = get_actor_from_args(args.model, args.pretrain).requires_grad_(False).half().cuda()
         critic = get_critic_from_args(args.model, args.critic_pretrain).requires_grad_(False).half().cuda()
@@ -73,7 +72,6 @@ def main(args):
         else:
             initial_model = get_actor_from_args(args.model, args.pretrain).requires_grad_(False).half().cuda()
         return actor, critic, reward_model, initial_model
-
     # configure Experience Maker
     experience_holder_refs = [
         ExperienceMakerHolder.options(name=f"maker{i}", num_gpus=1, max_concurrency=2).remote(
@@ -87,8 +85,6 @@ def main(args):
             kl_coef=0.1,
             debug=args.debug,
             update_lora_weights=not (args.lora_rank == 0),
-    # sync_models_from_trainers=True,
-    # generation kwargs:
             max_length=512,
             do_sample=True,
             temperature=1.0,
@@ -100,12 +96,10 @@ def main(args):
         )
         for i, env_info_maker in enumerate(env_info_makers)
     ]
-
     def trainer_model_fn():
         actor = get_actor_from_args(args.model, args.pretrain, lora_rank=args.lora_rank).half().cuda()
         critic = get_critic_from_args(args.model, args.critic_pretrain, lora_rank=args.lora_rank).half().cuda()
         return actor, critic
-
     # configure Trainer
     trainer_refs = [
         DetachedPPOTrainer.options(name=f"trainer{i}", num_gpus=1, max_concurrency=2).remote(
@@ -124,7 +118,6 @@ def main(args):
         )
         for i, env_info_trainer in enumerate(env_info_trainers)
     ]
-
     dataset_size = args.experience_batch_size * 4
 
     def build_dataloader():
@@ -142,17 +135,13 @@ def main(args):
     #     trainer_ref.sync_models_to_remote_makers.remote()
     #     for trainer_ref in trainer_refs
     # ])
-
     wait_tasks = []
-
     for experience_holder_ref in experience_holder_refs:
         wait_tasks.append(experience_holder_ref.workingloop.remote(build_dataloader, num_steps=args.experience_steps))
-
     total_steps = args.experience_batch_size * args.experience_steps * \
         args.num_makers // (args.num_trainers * args.train_batch_size)
     for trainer_ref in trainer_refs:
         wait_tasks.append(trainer_ref.fit.remote(total_steps, args.update_steps, args.train_epochs))
-
     ray.get(wait_tasks)
 
 
@@ -185,5 +174,13 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
 
-    ray.init(namespace=os.environ["RAY_NAMESPACE"], runtime_env={"env_vars": dict(os.environ)})
+    ray.init(address="0.0.0.0:6379",
+             namespace=os.environ["RAY_NAMESPACE"],
+             runtime_env={"env_vars": dict(os.environ)},
+             # _metrics_export_port="8080",
+             # include_dashboard=True,
+             # dashboard_host="0.0.0.0",
+             # dashboard_port="8265",
+             # _temp_dir="/nvme/ray/",
+             )
     main(args)

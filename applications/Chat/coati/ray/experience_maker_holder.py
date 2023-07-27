@@ -173,6 +173,7 @@ class ExperienceMakerHolder:
                         self._inference_step(batch)
                         pbar.update()
         self._on_loop_end()
+        # breakpoint()
 
     @ray.method(concurrency_group="model_io")
     def update_experience_maker(self,

@@ -103,6 +103,7 @@ class DetachedTrainer(ABC):
             pbar.set_postfix(metrics)
 
     def fit(self, total_steps: int, update_steps: int, train_epochs: int = 1) -> None:
+        # breakpoint()
         self._on_fit_start()
         for i in tqdm(range(total_steps // update_steps), desc='Trainer', disable=not is_rank_0()):
             self._on_episode_start(i)

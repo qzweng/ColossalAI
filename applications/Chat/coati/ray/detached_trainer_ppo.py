@@ -74,7 +74,7 @@ class DetachedPPOTrainer(DetachedTrainer):
         if env_info:
             set_dist_env(env_info=env_info)
         # configure strategy
-        self.strategy = strategy_fn()
+        self.strategy = strategy_fn() # applications/Chat/coati/trainer/strategies/colossalai.py
         # configure models, loss and optimizers
         with self.strategy.model_init_context():
             self.actor, self.critic = model_fn()
@@ -86,6 +86,7 @@ class DetachedPPOTrainer(DetachedTrainer):
             callbacks = callbacks + [evaluator]
 
         if isinstance(self.strategy, ColossalAIStrategy):
+            # breakpoint()
             self.actor_optim = HybridAdam(self.actor.parameters(), lr=1e-7)
             self.critic_optim = HybridAdam(self.critic.parameters(), lr=1e-7)
         else:
@@ -114,6 +115,7 @@ class DetachedPPOTrainer(DetachedTrainer):
     @torch.no_grad()
     def _update_remote_makers(self, fully_update: bool = False, **config):
         # TODO: balance duties
+        # breakpoint()
         if not fully_update:
             config['requires_grad_only'] = True
         self.update_target_holder_list()
@@ -186,6 +188,7 @@ class DetachedPPOTrainer(DetachedTrainer):
         self.strategy.save_optimizer(self.critic_optim, path, only_rank0)
 
     def _get_model_state_dict_shard(self, model: torch.nn.Module, fully_update=False, **config):
+        # breakpoint()
         for state_dict in self.strategy.get_model_state_dict_shard(model, **config):
             if not self._update_lora_weights or fully_update:
                 yield state_dict_to(state_dict)

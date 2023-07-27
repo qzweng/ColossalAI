@@ -639,7 +639,7 @@ class ZeroDDP(ColoDDP):
                          keep_vars: bool = False,
                          max_shard_size: int = 1024,
                          only_rank_0: bool = True,
-                         dtype: torch.dtype = torch.float16) -> Iterator[Tuple[OrderedDict, int]]:
+                         dtype: torch.dtype = torch.float16) -> Iterator[OrderedDict]:
         """Returns dictionaries containing a whole state of the module one by one. The max size of dictionary shard is specified by ``max_shard_size``.
 
         Both parameters and persistent buffers (e.g. running averages) are included.
@@ -681,7 +681,7 @@ class ZeroDDP(ColoDDP):
 
                 block, block_size = sharder.append(prefix + name, gathered_param)
                 if block is not None:
-                    yield block, block_size
+                    yield block #, block_size
 
         del fp16_to_fp32
         del gathered_param_buffer
@@ -692,7 +692,7 @@ class ZeroDDP(ColoDDP):
                 buffer = buf if keep_vars else buf.detach()
                 block, block_size = sharder.append(prefix + name, buffer)
                 if block is not None:
-                    yield block, block_size
+                    yield block #, block_size
         # save extra states
         extra_state_key = prefix + _EXTRA_STATE_KEY_SUFFIX
         if getattr(self.__class__, "get_extra_state",
@@ -700,9 +700,9 @@ class ZeroDDP(ColoDDP):
             extra_state = self.get_extra_state()
             block, block_size = sharder.append(extra_state_key, extra_state)
             if block is not None:
-                yield block, block_size
+                yield block #, block_size
 
-        yield sharder.current_block, sharder.current_block_size
+        yield sharder.current_block # , sharder.current_block_size
 
 
 class _StateDictSharder:

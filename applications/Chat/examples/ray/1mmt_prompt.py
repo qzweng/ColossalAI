@@ -6,6 +6,7 @@ from functools import partial
 import pandas as pd
 import ray
 import torch
+from context import coati
 from coati.quant import llama_load_quant, low_resource_init
 from coati.ray.detached_trainer_ppo import DetachedPPOTrainer
 from coati.ray.experience_maker_holder import ExperienceMakerHolder
