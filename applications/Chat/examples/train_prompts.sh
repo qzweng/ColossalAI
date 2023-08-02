@@ -1,3 +1,5 @@
+NUM_GPUS=8
+
 set_n_least_used_CUDA_VISIBLE_DEVICES() {
     local n=${1:-"9999"}
     echo "GPU Memory Usage:"
@@ -13,8 +15,17 @@ set_n_least_used_CUDA_VISIBLE_DEVICES() {
     echo "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 }
 
-set_n_least_used_CUDA_VISIBLE_DEVICES 2
+set_n_least_used_CUDA_VISIBLE_DEVICES ${NUM_GPUS}
 
-# torchrun --standalone --nproc_per_node=2 train_prompts.py prompts.csv --strategy colossalai_zero2
+BASE=$(realpath $(dirname $0))
+export PROMPT_DATASET=${BASE}/InstructionWild/data_v2/user_1.jsonl # https://github.com/XueFuzhao/InstructionWild.git
+export PRETRAIN_DATASET=${BASE}/InstructionWild/data/instinwild_en.json # https://github.com/XueFuzhao/InstructionWild.git
 
-torchrun --standalone --nproc_per_node=2 train_prompts.py --prompt_dataset /path/to/data.json --strategy colossalai_zero2
+torchrun --standalone \
+    --nproc_per_node=${NUM_GPUS} \
+    "${BASE}/train_prompts.py" \
+        --model bloom \
+        --pretrain "bigscience/bloom-560m" \
+        --prompt_dataset $PROMPT_DATASET \
+        --pretrain_dataset $PRETRAIN_DATASET \
+        --strategy colossalai_zero2

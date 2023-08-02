@@ -3,6 +3,7 @@ import argparse
 import pandas as pd
 import torch
 import torch.distributed as dist
+from context import coati
 from coati.dataset import DataCollatorForSupervisedDataset, PromptDataset, SupervisedDataset
 from coati.models.bloom import BLOOMRM, BLOOMActor, BLOOMCritic
 from coati.models.gpt import GPTRM, GPTActor, GPTCritic

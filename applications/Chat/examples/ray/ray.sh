@@ -24,16 +24,17 @@ function run() {
 }
 
 function dockerRun() {
-DOCKER_IMAGE=10.140.0.107:8090/llm/colossalai:0.3.0
+DOCKER_IMAGE=10.140.0.107:8090/llm/colossalai:0.3.0v0802
 docker run -d \
     --runtime=nvidia \
-    --name=wqzcolov1 \
-    -e NVIDIA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 \
+    --name=wqzcolov2 \
+    --gpus 8 \
     -v /home/wengqizhen/Workspace:/wks \
     -v /nvme:/nvme \
     --ipc="host" \
     --network="host" \
     ${DOCKER_IMAGE} bash -c "sleep infinity"
+    # -e NVIDIA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 \
 }
 
 $@
