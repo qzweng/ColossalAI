@@ -58,6 +58,7 @@ def main(args):
     # configure tokenizer
     tokenizer = AutoTokenizer.from_pretrained(args.pretrain)
     tokenizer.pad_token = tokenizer.eos_token
+
     def model_fn():
         actor = get_actor_from_args(args.model, args.pretrain).requires_grad_(False).half().cuda()
         critic = get_critic_from_args(args.model, args.critic_pretrain).requires_grad_(False).half().cuda()
@@ -72,9 +73,10 @@ def main(args):
         else:
             initial_model = get_actor_from_args(args.model, args.pretrain).requires_grad_(False).half().cuda()
         return actor, critic, reward_model, initial_model
+
     # configure Experience Maker
     experience_holder_refs = [
-        ExperienceMakerHolder.options(name=f"maker{i}", num_gpus=1, max_concurrency=2).remote(
+        ExperienceMakerHolder.options(name=f"maker{i}", num_gpus=1, max_concurrency=1000).remote(
             detached_trainer_name_list=[
                 f'trainer{x}'
                 for x in get_receivers_per_sender(i, args.num_makers, args.num_trainers, allow_idle_sender=False)
@@ -96,13 +98,15 @@ def main(args):
         )
         for i, env_info_maker in enumerate(env_info_makers)
     ]
+
     def trainer_model_fn():
         actor = get_actor_from_args(args.model, args.pretrain, lora_rank=args.lora_rank).half().cuda()
         critic = get_critic_from_args(args.model, args.critic_pretrain, lora_rank=args.lora_rank).half().cuda()
         return actor, critic
+
     # configure Trainer
     trainer_refs = [
-        DetachedPPOTrainer.options(name=f"trainer{i}", num_gpus=1, max_concurrency=2).remote(
+        DetachedPPOTrainer.options(name=f"trainer{i}", num_gpus=1, max_concurrency=1000).remote(
             experience_maker_holder_name_list=[
                 f"maker{x}"
                 for x in get_receivers_per_sender(i, args.num_trainers, args.num_makers, allow_idle_sender=True)
@@ -138,10 +142,13 @@ def main(args):
     wait_tasks = []
     for experience_holder_ref in experience_holder_refs:
         wait_tasks.append(experience_holder_ref.workingloop.remote(build_dataloader, num_steps=args.experience_steps))
+
     total_steps = args.experience_batch_size * args.experience_steps * \
         args.num_makers // (args.num_trainers * args.train_batch_size)
+
     for trainer_ref in trainer_refs:
         wait_tasks.append(trainer_ref.fit.remote(total_steps, args.update_steps, args.train_epochs))
+
     ray.get(wait_tasks)
 
 

@@ -146,3 +146,4 @@ docs/.build
 example/wandb/
 
 examples/awesome-chatgpt-prompts/
+actor_checkpoint_prompts
